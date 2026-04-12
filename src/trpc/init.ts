@@ -57,7 +57,7 @@ export const premiumProcedure = (entity: "meetings" | "agents") =>
       customer = await polarClient.customers.getStateExternal({
         externalId: ctx.auth.user.id,
       });
-    } catch (error) {
+    } catch {
       // New user without a Polar customer record yet
     }
 

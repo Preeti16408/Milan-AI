@@ -25,7 +25,7 @@ export const premiumRouter = createTRPCRouter({
             });
 
             return product;
-        } catch (error) {
+        } catch {
             return null;
         }
     }),
@@ -51,7 +51,7 @@ export const premiumRouter = createTRPCRouter({
             if(subscription){
                 return null;
             }
-        } catch (error) {
+        } catch {
             // New user without a Polar customer record yet
         }
 
