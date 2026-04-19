@@ -7,7 +7,7 @@ import { MeetingIdViewHeader } from "../components/meeting-id-view-header";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/hooks/use-confirm";
 import { UpdateMeetingDialog } from "../components/update-meeting-dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UpcomingState } from "../components/upcoming-states";
 import { ActiveState } from "../components/active-state";
 import { CancelledState } from "../components/cancelled-state";
@@ -31,9 +31,18 @@ export const MeetingIdView = ({ meetingId }: Props) => {
         "The following action will remove this meeting."
     )
 
-    const { data } = useSuspenseQuery(
+    const { data, refetch } = useSuspenseQuery(
         trpc.meetings.getOne.queryOptions({ id: meetingId }),
     );
+
+    useEffect(() => {
+        if (data.status === "processing") {
+            const interval = setInterval(() => {
+                refetch();
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [data.status, refetch]);
 
 const removeMeeting = useMutation(
     trpc.meetings.remove.mutationOptions({
