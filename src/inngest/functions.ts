@@ -31,7 +31,7 @@ Example:
 - Feature X automatically does Y
 - Mention of integration with Z
     `.trim(),
-    model: openai({model: "o3-mini", apiKey: process.env.OPENAI_API_KEY}),
+    model: openai({model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY}),
 });
 export const meetingsProcessing = inngest.createFunction(
   { id: "meetings/processing" },
@@ -49,27 +49,28 @@ export const meetingsProcessing = inngest.createFunction(
       const speakerIds = [
         ...new Set(transcript.map((item) => item.speaker_id)),
       ];
-      const userSpeakers = await db
-        .select()
-        .from(user)
-        .where(inArray(user.id, speakerIds))
-        .then((users) =>
-          users.map((user) => ({
-            ...user,
-          }))
-        );
+      const [userSpeakers, agentSpeakers] = await Promise.all([
+        db
+          .select()
+          .from(user)
+          .where(inArray(user.id, speakerIds))
+          .then((users) =>
+            users.map((user) => ({
+              ...user,
+            }))
+          ),
+        db
+          .select()
+          .from(agents)
+          .where(inArray(agents.id, speakerIds))
+          .then((agents) =>
+            agents.map((agent) => ({
+              ...agent,
+            }))
+          ),
+      ]);
 
-      const agentSpeakers = await db
-        .select()
-        .from(agents)
-        .where(inArray(agents.id, speakerIds))
-        .then((agents) =>
-          agents.map((agent) => ({
-            ...agent,
-          }))
-        );
-
-        const speakers = [...userSpeakers, ...agentSpeakers];
+      const speakers = [...userSpeakers, ...agentSpeakers];
 
         return transcript.map((item) =>{
             const speaker =  speakers.find(
@@ -96,9 +97,13 @@ export const meetingsProcessing = inngest.createFunction(
 
      });
 
+     const cleanTranscriptText = transcriptWithSpeakers
+        .map((item) => `${item.user?.name || 'Unknown'}: ${item.text}`)
+        .join("\n");
+
      const { output } = await summarizer.run(
-        "Summarize the following transcript :" +
-        JSON.stringify(transcriptWithSpeakers)
+        "Summarize the following transcript :\n\n" +
+        cleanTranscriptText
      );
 
      await step.run("save-summary", async() =>{
