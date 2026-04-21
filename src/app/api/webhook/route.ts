@@ -18,6 +18,7 @@ import { inngest } from "@/inngest/client";
 import { generatedAvatarUri } from "@/lib/avatar";
 import { streamChat } from "@/lib/stream-chat";
 import { streamVideo } from "@/lib/stream-video";
+import JSONL from "jsonl-parse-stringify";
 
 const openaiClient = new OpenAi({
     apiKey: process.env.OPENAI_API_KEY!});
@@ -183,13 +184,31 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    await inngest.send({
-        name: "meetings/processing",
-        data: {
-            meetingId: updatedMeeting.id,
-            transcriptURL: updatedMeeting.transcriptURL,
-        },
-    })
+    try {
+        console.log("Generating summary inline for meeting:", meetingId);
+        const res = await fetch(updatedMeeting.transcriptURL);
+        const text = await res.text();
+        const transcript = JSONL.parse<{speaker_id: string, text: string}>(text);
+        const cleanText = transcript.map(i => `${i.speaker_id || 'Unknown'}: ${i.text}`).join("\n");
+        
+        const completion = await openaiClient.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: "You are an expert summarizer. Write a concise, readable summary using markdown with an Overview and Notes section." },
+                { role: "user", content: "Summarize this transcript:\n\n" + cleanText }
+            ]
+        });
+        
+        const summary = completion.choices[0]?.message?.content;
+        
+        await db.update(meetings)
+        .set({ summary: summary, status: "completed" })
+        .where(eq(meetings.id, updatedMeeting.id));
+        console.log("Summary generated successfully!");
+
+    } catch (err) {
+        console.error("Failed to generate summary inline:", err);
+    }
 
    }else if(eventType === "call.recording_ready"){
     const event = payload as CallRecordingReadyEvent;
