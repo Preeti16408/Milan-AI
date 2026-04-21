@@ -47,10 +47,10 @@ export const meetingsProcessing = inngest.createFunction(
 
     const transcriptWithSpeakers = await step.run("add-speakers", async () => {
       const speakerIds = [
-        ...new Set(transcript.map((item) => item.speaker_id)),
+        ...new Set(transcript.map((item) => item.speaker_id).filter(Boolean)),
       ];
       const [userSpeakers, agentSpeakers] = await Promise.all([
-        db
+        speakerIds.length > 0 ? db
           .select()
           .from(user)
           .where(inArray(user.id, speakerIds))
@@ -58,8 +58,8 @@ export const meetingsProcessing = inngest.createFunction(
             users.map((user) => ({
               ...user,
             }))
-          ),
-        db
+          ) : Promise.resolve([]),
+        speakerIds.length > 0 ? db
           .select()
           .from(agents)
           .where(inArray(agents.id, speakerIds))
@@ -67,7 +67,7 @@ export const meetingsProcessing = inngest.createFunction(
             agents.map((agent) => ({
               ...agent,
             }))
-          ),
+          ) : Promise.resolve([]),
       ]);
 
       const speakers = [...userSpeakers, ...agentSpeakers];
@@ -101,10 +101,12 @@ export const meetingsProcessing = inngest.createFunction(
         .map((item) => `${item.user?.name || 'Unknown'}: ${item.text}`)
         .join("\n");
 
-     const { output } = await summarizer.run(
-        "Summarize the following transcript :\n\n" +
-        cleanTranscriptText
-     );
+     const { output } = await step.run("generate-summary", async () => {
+         return summarizer.run(
+            "Summarize the following transcript :\n\n" +
+            cleanTranscriptText
+         );
+     });
 
      await step.run("save-summary", async() =>{
         await db
