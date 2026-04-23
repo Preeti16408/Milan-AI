@@ -9,3 +9,5 @@ export const { GET, POST, PUT } = serve({
    meetingsProcessing,
   ],
 });
+
+export const maxDuration = 60;
