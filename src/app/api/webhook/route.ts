@@ -14,7 +14,7 @@ import {
 
 import { db } from "@/db";
 import { agents, meetings } from "@/db/schema";
-import { inngest } from "@/inngest/client";
+
 import { generatedAvatarUri } from "@/lib/avatar";
 import { streamChat } from "@/lib/stream-chat";
 import { streamVideo } from "@/lib/stream-video";
@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
 
     try {
         console.log("Generating summary inline for meeting:", meetingId);
-        const res = await fetch(updatedMeeting.transcriptURL);
+        const res = await fetch(updatedMeeting.transcriptURL!);
         const text = await res.text();
         const transcript = JSONL.parse<{speaker_id: string, text: string}>(text);
         const cleanText = transcript.map(i => `${i.speaker_id || 'Unknown'}: ${i.text}`).join("\n");
